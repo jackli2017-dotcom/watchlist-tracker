@@ -1,0 +1,19 @@
+name: Daily Job Tracker
+
+on:
+  schedule:
+    - cron: '0 13 * * *'   # 6am PT / 9am ET daily
+  workflow_dispatch:        # lets you trigger manually for testing
+
+jobs:
+  track:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - run: pip install requests gspread google-auth
+      - run: python tracker.py
+        env:
+          GOOGLE_SERVICE_ACCOUNT_JSON: ${{ secrets.GOOGLE_SERVICE_ACCOUNT_JSON }}
