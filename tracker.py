@@ -1,6 +1,5 @@
 ### 3.3 Add the job tracker script (30 minutes with Codex)
 
-```python
 #!/usr/bin/env python3
 """
 Daily job tracker for private-company watchlist.
@@ -271,5 +270,4 @@ def main():
 
 if __name__ == "__main__":
     main()
-```
 
