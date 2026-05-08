@@ -30,7 +30,7 @@ COMPANIES = [
     {"name": "Octopus Deploy", "board": "greenhouse", "slug": "octopusdeploy"},
 ]
 
-SHEET_NAME = "Competitor Intelligence Tracker"
+SHEET_ID = "1OaNh7Tq7MM8JP6S7qIXBC5toNd3k79WR9DM9tk2x1b0"
 
 
 def fetch_greenhouse(slug):
@@ -181,7 +181,7 @@ def main():
         scopes=["https://www.googleapis.com/auth/spreadsheets"],
     )
     gc = gspread.authorize(creds)
-    wb = gc.open(SHEET_NAME)
+    wb = gc.open_by_key(SHEET_ID)
     jobs_tab = wb.worksheet("Jobs")
     trend_tab = wb.worksheet("Hiring Trend")
 
