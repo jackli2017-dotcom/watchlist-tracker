@@ -16,6 +16,7 @@ import gspread
 from datetime import datetime, timezone
 from gspread.utils import rowcol_to_a1
 from google.oauth2.service_account import Credentials
+pip install beautifulsoup4
 
 # Edit this list with your 5 companies.
 # board must be one of: "greenhouse", "lever", "ashby", "paylocity"
@@ -23,7 +24,7 @@ from google.oauth2.service_account import Credentials
 #   https://recruiting.paylocity.com/Recruiting/Jobs/All/{PORTAL_ID}/Cloud-Bees-Inc
 # Find it by visiting the company's careers page and copying from the URL.
 COMPANIES = [
-    {"name": "Harness",        "board": "greenhouse", "slug": "harness"},
+    {"name": "Harness",        "board": "greenhouse", "slug": "harnessinc"},
     {"name": "CircleCI",       "board": "greenhouse", "slug": "circleci"},
     {"name": "CloudBees",      "board": "paylocity",  "slug": "a432d829-f701-4cf3-9108-56ef703b2ac5"},
     {"name": "Buildkite",      "board": "greenhouse", "slug": "buildkite"},
