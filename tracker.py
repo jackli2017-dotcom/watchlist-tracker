@@ -1,7 +1,5 @@
 ### 3.3 Add the job tracker script (30 minutes with Codex)
 
-Create a file called `tracker.py` in your repo with this content. You can paste this into Codex and ask it to adapt it to your specific 5 companies, or just edit the `COMPANIES` list directly.
-
 ```python
 #!/usr/bin/env python3
 """
