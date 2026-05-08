@@ -28,7 +28,7 @@ from google.oauth2.service_account import Credentials
 COMPANIES = [
     {"name": "Harness",        "board": "greenhouse", "slug": "harness"},
     {"name": "CircleCI",       "board": "greenhouse", "slug": "circleci"},
-    {"name": "CloudBees",      "board": "paylocity",  "slug": "PASTE_PORTAL_ID_HERE"},
+    {"name": "CloudBees",      "board": "paylocity",  "slug": "a432d829-f701-4cf3-9108-56ef703b2ac5"},
     {"name": "Buildkite",      "board": "greenhouse", "slug": "buildkite"},
     {"name": "Octopus Deploy", "board": "greenhouse", "slug": "octopusdeploy"},
 ]
