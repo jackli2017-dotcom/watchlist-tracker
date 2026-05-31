@@ -1,11 +1,9 @@
-### 3.3 Add the job tracker script (30 minutes with Codex)
-
 #!/usr/bin/env python3
 """
 Daily job tracker for private-company watchlist.
 Pulls open roles from Greenhouse, Lever, Ashby, and Paylocity boards.
 Detects new roles (appends them with Status=NEW) and removed roles (marks
-them in place with Removed=YES + Removed Date), then writes a daily
+them in place with Removed=TRUE + Removed Date), then writes a daily
 headcount snapshot to the Hiring Trend tab.
 """
 import os
@@ -19,17 +17,21 @@ from google.oauth2.service_account import Credentials
 
 # Edit this list with your 5 companies.
 # board must be one of: "greenhouse", "lever", "ashby", "paylocity"
-# For paylocity, slug = the GUID-like PortalId in the careers URL, e.g.
+# For paylocity, slug is the FULL path after /All/ in the careers URL,
+# i.e. both the GUID PortalId AND the company slug joined by /, e.g.
 #   https://recruiting.paylocity.com/Recruiting/Jobs/All/{PORTAL_ID}/Cloud-Bees-Inc
-# Find it by visiting the company's careers page and copying from the URL.
+# → slug = "{PORTAL_ID}/Cloud-Bees-Inc"
 COMPANIES = [
-    {"name": "Harness",        "board": "greenhouse", "slug": "harnessinc"},
+    {"name": "Harness",        "board": "greenhouse", "slug": "harness"},
     {"name": "CircleCI",       "board": "greenhouse", "slug": "circleci"},
-    {"name": "CloudBees",      "board": "paylocity",  "slug": "a432d829-f701-4cf3-9108-56ef703b2ac5"},
+    {"name": "CloudBees",      "board": "paylocity",  "slug": "a432d829-f701-4cf3-9108-56ef703b2ac5/Cloud-Bees-Inc"},
     {"name": "Buildkite",      "board": "greenhouse", "slug": "buildkite"},
     {"name": "Octopus Deploy", "board": "greenhouse", "slug": "octopusdeploy"},
 ]
 
+# Use the spreadsheet ID (the long string between /d/ and /edit in the sheet URL)
+# rather than the name. open_by_key needs only the Sheets scope; open(name) would
+# need the Drive scope too.
 SHEET_ID = "1OaNh7Tq7MM8JP6S7qIXBC5toNd3k79WR9DM9tk2x1b0"
 
 
@@ -78,80 +80,49 @@ def fetch_ashby(slug):
     ]
 
 
-def fetch_paylocity(portal_id):
+def fetch_paylocity(slug):
     """
-    Scrape Paylocity careers (used by CloudBees and others).
+    Scrape Paylocity careers (CloudBees, others).
 
-    portal_id is the GUID-like value from the Paylocity URL after /All/, e.g.
-      https://recruiting.paylocity.com/Recruiting/Jobs/All/{PORTAL_ID}/Cloud-Bees-Inc
+    `slug` is the FULL path after /All/ — both the PortalId GUID and the
+    company slug joined by /, e.g.:
+      "a432d829-f701-4cf3-9108-56ef703b2ac5/Cloud-Bees-Inc"
 
-    Tries Paylocity's JSON search endpoint first; falls back to HTML scraping.
-    If neither path returns jobs, the specific Paylocity portal version may
-    differ. Open the careers page in Chrome DevTools (Network tab), reload,
-    and look for an XHR returning JSON — that's the real endpoint to use.
-    Hand the actual URL to Codex and ask it to adapt this function.
+    Paylocity embeds the full job list as a JSON blob inside the page HTML
+    (search the page source for `"Jobs":[`). Some portals only embed it
+    when the company suffix is in the URL and the request looks like a
+    real browser, so we send Chrome-like headers below.
+
+    If the jobs array isn't found, the log prints diagnostics (status code,
+    response length, first 200 chars) so you can see whether you got a
+    redirect, block page, or a different embedded-data pattern.
     """
-    headers = {"User-Agent": "Mozilla/5.0 (compatible; watchlist-tracker)"}
-
-    # Path 1 — JSON search endpoint
-    try:
-        json_url = (
-            "https://recruiting.paylocity.com/Recruiting/Jobs/GetSearchData"
-            f"?CategoryId=&LocationId=&Term=&Skip=0&Take=200&PortalId={portal_id}"
-        )
-        r = requests.get(json_url, headers=headers, timeout=30)
-        if r.ok and "json" in r.headers.get("content-type", ""):
-            data = r.json()
-            raw_jobs = data.get("Jobs") or data.get("Results") or data.get("Data") or []
-            if raw_jobs:
-                return [_normalize_paylocity_job(j) for j in raw_jobs]
-    except Exception as e:
-        print(f"  Paylocity JSON endpoint failed: {e}; falling back to HTML")
-
-    # Path 2 — HTML fallback
-    try:
-        from bs4 import BeautifulSoup
-    except ImportError:
-        raise RuntimeError(
-            "Paylocity HTML fallback requires beautifulsoup4. "
-            "Add it to your GitHub Actions pip install line."
-        )
-
-    html_url = f"https://recruiting.paylocity.com/Recruiting/Jobs/All/{portal_id}"
-    r = requests.get(html_url, headers=headers, timeout=30)
+    headers = {
+        "User-Agent": (
+            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+            "AppleWebKit/537.36 (KHTML, like Gecko) "
+            "Chrome/147.0.0.0 Safari/537.36"
+        ),
+        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+        "Accept-Language": "en-US,en;q=0.9",
+    }
+    url = f"https://recruiting.paylocity.com/Recruiting/Jobs/All/{slug}"
+    r = requests.get(url, headers=headers, timeout=30)
     r.raise_for_status()
-    soup = BeautifulSoup(r.text, "html.parser")
+    html = r.text
 
-    jobs, seen = [], set()
-    for link in soup.find_all("a", href=re.compile(r"/Apply/\d+/")):
-        href = link.get("href", "")
-        m = re.search(r"/Apply/(\d+)/", href)
-        if not m:
-            continue
-        job_id = m.group(1)
-        if job_id in seen:
-            continue
-        seen.add(job_id)
-        full_url = href if href.startswith("http") else f"https://recruiting.paylocity.com{href}"
-        title = link.get_text(strip=True)
-        if not title:
-            continue
-        dept = ""
-        parent = link.find_parent()
-        if parent:
-            for sib in parent.find_all(["span", "div"]):
-                txt = sib.get_text(strip=True)
-                if txt and txt != title and len(txt) < 60:
-                    dept = txt
-                    break
-        jobs.append({
-            "title": title,
-            "location": "",
-            "department": dept,
-            "url": full_url,
-            "external_id": job_id,
-        })
-    return jobs
+    idx = html.find('"Jobs":[')
+    if idx < 0:
+        idx = html.find('"Jobs": [')
+    if idx < 0:
+        print(f"  Paylocity: 'Jobs' array not found. "
+              f"status={r.status_code} length={len(html)} "
+              f"first200={html[:200]!r}")
+        return []
+    start = html.index('[', idx)
+    decoder = json.JSONDecoder()
+    raw_jobs, _ = decoder.raw_decode(html[start:])
+    return [_normalize_paylocity_job(j) for j in raw_jobs]
 
 
 def _normalize_paylocity_job(j):
@@ -159,8 +130,9 @@ def _normalize_paylocity_job(j):
     job_id = str(j.get("JobId") or j.get("Id") or j.get("RequisitionId") or "")
     return {
         "title": j.get("JobTitle") or j.get("Title") or j.get("Name") or "",
-        "location": j.get("Location") or j.get("LocationName") or "",
-        "department": j.get("Department") or j.get("Category") or "",
+        "location": j.get("LocationName") or j.get("Location") or "",
+        "department": (j.get("Department") or j.get("DepartmentName")
+                       or j.get("Category") or j.get("Categories") or ""),
         "url": (j.get("Url") or j.get("ApplyUrl")
                 or f"https://recruiting.paylocity.com/Recruiting/Jobs/Details/{job_id}"),
         "external_id": job_id,
@@ -247,7 +219,7 @@ def main():
             if key in current_keys:
                 continue                                      # still listed
             # Treat any of TRUE / YES / 1 as already-marked; FALSE / NO / blank
-            # are all treated as "not yet marked" (active row, eligible to mark).
+            # are all "not yet marked" (active row, eligible to mark).
             removed_val = str(row.get("Removed", "")).strip().upper()
             if removed_val in ("TRUE", "YES", "1"):
                 continue
@@ -258,8 +230,8 @@ def main():
             removed_count += 1
 
         if cell_updates:
-            # value_input_option='USER_ENTERED' makes Sheets parse 'TRUE' as a
-            # boolean and the date string as a real date, not raw text.
+            # USER_ENTERED makes Sheets parse 'TRUE' as a boolean and the date
+            # string as a real date, not raw text.
             jobs_tab.batch_update(cell_updates, value_input_option='USER_ENTERED')
             print(f"Marked {removed_count} roles as Removed")
 
@@ -270,4 +242,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-
