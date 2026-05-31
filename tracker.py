@@ -22,7 +22,7 @@ from google.oauth2.service_account import Credentials
 #   https://recruiting.paylocity.com/Recruiting/Jobs/All/{PORTAL_ID}/Cloud-Bees-Inc
 # → slug = "{PORTAL_ID}/Cloud-Bees-Inc"
 COMPANIES = [
-    {"name": "Harness",        "board": "greenhouse", "slug": "harness"},
+    {"name": "Harness",        "board": "greenhouse", "slug": "harnessinc"},
     {"name": "CircleCI",       "board": "greenhouse", "slug": "circleci"},
     {"name": "CloudBees",      "board": "paylocity",  "slug": "a432d829-f701-4cf3-9108-56ef703b2ac5/Cloud-Bees-Inc"},
     {"name": "Buildkite",      "board": "greenhouse", "slug": "buildkite"},
